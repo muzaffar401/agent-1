@@ -1,49 +1,49 @@
-from agents import Agent,AsyncOpenAI,OpenAIChatCompletionsModel,set_tracing_disabled,Runner
-import os 
+from agents import Agent,AsyncOpenAI,OpenAIChatCompletionsModel,RunConfig,Runner
+import os
 from dotenv import load_dotenv
 import chainlit as cl
 
 load_dotenv()
 
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 
-openrouter_api_key = os.getenv("OPEN_ROUTER_API_KEY")
-openrouter_base_url = "https://openrouter.ai/api/v1"
-deepseek_model = "deepseek/deepseek-chat-v3-0324:free"
-
-provider = AsyncOpenAI(
-    api_key=openrouter_api_key,
-    base_url=openrouter_base_url
+external_client = AsyncOpenAI(
+    api_key=gemini_api_key,
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
+model = OpenAIChatCompletionsModel(
+    model="gemini-2.0-flash",
+    openai_client=external_client
+)
 
-set_tracing_disabled(disabled=True)
-
+config = RunConfig(
+    model=model,
+    model_provider=external_client,
+    tracing_disabled=True
+)
 
 agent = Agent(
-    name="Assistant",
-    instructions="You are a helpful assistant to answer any question",
-    model=OpenAIChatCompletionsModel(model=deepseek_model,openai_client=provider)
+    name="Ai Assistant",
+    instructions="You are a helpful assistant to answer any question"
 )
 
 @cl.on_chat_start
-async def handle_chat():
+async def handle_chat_message():
     cl.user_session.set("history",[])
-    await cl.Message(content="Hello,How may i help you😊").send()
+    await cl.Message(content="Hello, How may i help you").send()
+
 
 @cl.on_message
 async def handle_message(message:cl.Message):
     history = cl.user_session.get("history")
     history.append({"role":"user","content":message.content})
     result = await Runner.run(
-    starting_agent=agent,
-    input=history
+        starting_agent=agent,
+        input=history,
+        run_config=config
     )
     history.append({"role":"assistant","content":result.final_output})
     cl.user_session.set("history",history)
+
     await cl.Message(content=result.final_output).send()
-
-
-    
-
-
-
